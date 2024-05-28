@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.main.json",
+  "references": [
+    { "path": "./tsconfig.vitest.json" }
+  ]
+}
