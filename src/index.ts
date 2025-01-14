@@ -1,6 +1,7 @@
 import type { PluginCreator, Input } from 'postcss';
 import { relative } from 'node:path';
 import { cwd } from 'node:process';
+import { transform } from './transform';
 
 export type RuleItem = {
   includes: RegExp | ((path: string, input: Input) => boolean);
@@ -19,7 +20,7 @@ const creator: PluginCreator<PluginOptions> = (opts?: PluginOptions) => {
   }
   return {
     postcssPlugin: 'wrap-up-layer',
-    OnceExit (root, { atRule }) {
+    OnceExit (root) {
       if (root.nodes.length === 0) {
         return;
       }
@@ -35,14 +36,7 @@ const creator: PluginCreator<PluginOptions> = (opts?: PluginOptions) => {
         const rule = opts.rules.find((item) => item.includes instanceof RegExp ? item.includes.test(path) : item.includes(path, source.input));
         if (rule) {
           const nodes = root.nodes;
-          root.nodes = [];
-          const layer = atRule({
-            name: 'layer',
-            params: rule.layerName,
-            nodes: nodes,
-            source: root.source,
-          });
-          root.append(layer);
+          root.nodes = transform(nodes, rule.layerName, root.source);
         }
       }
     },
