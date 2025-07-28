@@ -2,15 +2,15 @@ import { expect, test } from 'vitest';
 import postcss from 'postcss';
 import prettier from 'prettier';
 
-import { transform } from '~/transform';
+import { transform, TransformOptions } from '~/transform';
 
 async function format (cssString: string) {
   return prettier.format(cssString, { parser: 'css' });
 }
 
-async function run (input: string, layerName: string) {
+async function run (input: string, layerName: string, options: TransformOptions = {}) {
   const root = postcss.parse(input);
-  const nodes = transform(root.nodes, layerName);
+  const nodes = transform(root.nodes, layerName, undefined, options);
   root.nodes = nodes;
   return format(root.toString());
 }
@@ -205,6 +205,69 @@ test('Test transform with @import', async () => {
   `, 'base')).resolves.toBe(await format(`
     @import url('styles.css') layer(base);
     @charset "UTF-8";
+    @layer base {
+      a {
+        width: 100%;
+      }
+    }
+  `));
+});
+
+test.each([
+  'charset',
+  'namespace',
+  'property',
+  'font-face',
+  'keyframes',
+])('Test transform with outside at-rule %s', async (name) => {
+  await expect(run(`
+    @${name} "value";
+    a {
+      width: 100%;
+    }
+  `, 'base')).resolves.toBe(await format(`
+    @${name} "value";
+    @layer base {
+      a {
+        width: 100%;
+      }
+    }
+  `));
+});
+
+test('Test transform with outside at-rule', async () => {
+  await expect(run(`
+    @my-rule 'hello';
+    a {
+      width: 100%;
+    }
+  `, 'base', { outsideAtRules: ['my-rule'] })).resolves.toBe(await format(`
+    @my-rule 'hello';
+    @layer base {
+      a {
+        width: 100%;
+      }
+    }
+  `));
+});
+
+test('Test transform with outside at-rule import', async () => {
+  const input = `
+    @import url('styles.css');
+    a {
+      width: 100%;
+    }
+  `;
+  await expect(run(input, 'base', { outsideAtRules: [] })).resolves.toBe(await format(`
+    @import url('styles.css') layer(base);
+    @layer base {
+      a {
+        width: 100%;
+      }
+    }
+  `));
+  await expect(run(input, 'base', { outsideAtRules: ['import'] })).resolves.toBe(await format(`
+    @import url('styles.css');
     @layer base {
       a {
         width: 100%;
