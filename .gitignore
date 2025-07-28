@@ -191,7 +191,4 @@ coverage
 
 *.tsbuildinfo
 
-
-yarn.lock
-package-lock.json
-.demo
+.pnpm-store
