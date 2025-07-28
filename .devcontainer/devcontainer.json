@@ -1,0 +1,23 @@
+{
+  "name": "Postcss wrap up layer",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:dev-22",
+  "remoteUser": "root",
+  "mounts": [
+    "type=bind,source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/root/.ssh,readonly"
+  ],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "streetsidesoftware.code-spell-checker",
+        "w88975.code-translate",
+        "EditorConfig.EditorConfig",
+        "waderyan.gitblame",
+        "mhutchie.git-graph",
+        "donjayamanne.githistory",
+        "oderwat.indent-rainbow",
+        "yzhang.markdown-all-in-one",
+        "vitest.explorer"
+      ]
+    }
+  }
+}
