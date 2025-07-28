@@ -1,6 +1,19 @@
 import { AtRule, atRule, ChildNode, Source } from 'postcss';
 
-export function transform (nodes: ChildNode[], layerName: string, source?: Source) {
+export interface TransformOptions {
+  outsideAtRules?: string[];
+}
+
+export function transform (nodes: ChildNode[], layerName: string, source?: Source, options: TransformOptions = {}): ChildNode[] {
+  const outsideAtRules = [
+    'charset',
+    'namespace',
+    'property',
+    'font-face',
+    'keyframes',
+    ...(options.outsideAtRules || []),
+  ];
+
   const result: ChildNode[] = [];
   let layer: AtRule | null = null;
   const pushToLayer = (node: ChildNode) => {
@@ -27,7 +40,7 @@ export function transform (nodes: ChildNode[], layerName: string, source?: Sourc
 
   [...nodes].forEach((node) => {
     if (node.type === 'atrule') {
-      if (node.name === 'charset' || node.name === 'namespace') {
+      if (outsideAtRules.includes(node.name)) {
         pushToResult(node);
         return;
       }

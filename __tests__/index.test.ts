@@ -122,3 +122,56 @@ describe('Test includes functions', () => {
     expect(includes.mock.lastCall?.[1].from).toBe(resolve('src/index.css'));
   });
 });
+
+describe('Test transform options', () => {
+  const input = `
+    @charset "UTF-8";
+    @namespace url("http://www.w3.org/1999/xhtml");
+    @import "test.css";
+    a { width: 100%; }
+  `;
+
+  test('Test transform without outsideAtRules import', async () => {
+    const processor = postcss([plugin({
+      rules: [
+        {
+          includes: /^src[\\/]pages/,
+          layerName: 'my-pages',
+        },
+      ],
+    })]);
+    (transform as Mock).mockClear();
+    const result = await processor.process(input, { from: resolve('src/pages/index.css') });
+    expect(await format(result.root.toString())).toBe(await format(`
+      @charset "UTF-8";
+      @namespace url("http://www.w3.org/1999/xhtml");
+      @import "test.css" layer(my-pages);
+      @layer my-pages { a { width: 100%; } }
+    `));
+    expect(transform).toHaveBeenCalledOnce();
+    expect(transform).toHaveBeenCalledWith(expect.any(Array), 'my-pages', expect.anything(), undefined);
+  });
+  test('Test transform with outsideAtRules import', async () => {
+    const processor = postcss([plugin({
+      rules: [
+        {
+          includes: /^src[\\/]pages/,
+          layerName: 'my-pages',
+        },
+      ],
+      transformOptions: {
+        outsideAtRules: ['import'],
+      },
+    })]);
+    (transform as Mock).mockClear();
+    const result = await processor.process(input, { from: resolve('src/pages/index.css') });
+    expect(await format(result.root.toString())).toBe(await format(`
+      @charset "UTF-8";
+      @namespace url("http://www.w3.org/1999/xhtml");
+      @import "test.css";
+      @layer my-pages { a { width: 100%; } }
+    `));
+    expect(transform).toHaveBeenCalledOnce();
+    expect(transform).toHaveBeenCalledWith(expect.any(Array), 'my-pages', expect.anything(), { outsideAtRules: ['import'] });
+  });
+});

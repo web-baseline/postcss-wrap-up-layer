@@ -1,7 +1,7 @@
 import type { PluginCreator, Input } from 'postcss';
 import { relative } from 'node:path';
 import { cwd } from 'node:process';
-import { transform } from './transform';
+import { transform, TransformOptions } from './transform';
 
 export type RuleItem = {
   includes: RegExp | ((path: string, input: Input) => boolean);
@@ -10,6 +10,7 @@ export type RuleItem = {
 export type PluginOptions = {
   rules: RuleItem[];
   ignoreOnlyComments?: boolean;
+  transformOptions?: TransformOptions;
 };
 
 const creator: PluginCreator<PluginOptions> = (opts?: PluginOptions) => {
@@ -36,7 +37,7 @@ const creator: PluginCreator<PluginOptions> = (opts?: PluginOptions) => {
         const rule = opts.rules.find((item) => item.includes instanceof RegExp ? item.includes.test(path) : item.includes(path, source.input));
         if (rule) {
           const nodes = root.nodes;
-          root.nodes = transform(nodes, rule.layerName, root.source);
+          root.nodes = transform(nodes, rule.layerName, root.source, opts.transformOptions);
         }
       }
     },
