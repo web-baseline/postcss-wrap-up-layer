@@ -1,12 +1,10 @@
-import type { PluginCreator, Input } from 'postcss';
+import type { PluginCreator } from 'postcss';
 import { relative } from 'node:path';
 import { cwd } from 'node:process';
 import { transform, TransformOptions } from './transform';
+import { isFilterRule, isMapRule, RuleItem } from './utils';
+export { RuleItem, FilterRuleItem, MapRuleItem } from './utils';
 
-export type RuleItem = {
-  includes: RegExp | ((path: string, input: Input) => boolean);
-  layerName: string;
-};
 export type PluginOptions = {
   rules: RuleItem[];
   ignoreOnlyComments?: boolean;
@@ -19,6 +17,7 @@ const creator: PluginCreator<PluginOptions> = (opts?: PluginOptions) => {
       postcssPlugin: 'wrap-up-layer',
     };
   }
+  const validRules = opts.rules.filter((rule) => isFilterRule(rule) || isMapRule(rule));
   return {
     postcssPlugin: 'wrap-up-layer',
     OnceExit (root) {
@@ -34,10 +33,23 @@ const creator: PluginCreator<PluginOptions> = (opts?: PluginOptions) => {
       const { source } = root;
       if (source?.input.file) {
         const path = relative(cwd(), source.input.file);
-        const rule = opts.rules.find((item) => item.includes instanceof RegExp ? item.includes.test(path) : item.includes(path, source.input));
-        if (rule) {
-          const nodes = root.nodes;
-          root.nodes = transform(nodes, rule.layerName, root.source, opts.transformOptions);
+        const nodes = root.nodes;
+        for (const rule of validRules) {
+          if (isFilterRule(rule)) {
+            if (rule.includes instanceof RegExp ? rule.includes.test(path) : rule.includes(path, source.input)) {
+              root.nodes = transform(nodes, rule.layerName, root.source, Object.assign({}, opts.transformOptions, rule.transformOptions));
+              return;
+            }
+          } else if (isMapRule(rule)) {
+            const mapResult = rule.map(path, source.input);
+            if (typeof mapResult === 'string') {
+              root.nodes = transform(nodes, mapResult, root.source, Object.assign({}, opts.transformOptions));
+              return;
+            } else if (typeof mapResult === 'object' && typeof mapResult.layerName === 'string') {
+              root.nodes = transform(nodes, mapResult.layerName, root.source, Object.assign({}, opts.transformOptions, mapResult.transformOptions));
+              return;
+            }
+          }
         }
       }
     },
