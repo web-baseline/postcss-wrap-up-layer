@@ -24,8 +24,9 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe('Test rules', async () => {
-  const processor = postcss([plugin({
+describe.each([
+  {
+    name: 'Test filter rules',
     rules: [
       {
         includes: /^node_modules[\\/]test/,
@@ -48,9 +49,32 @@ describe('Test rules', async () => {
         includes: /^src[\\/]unreachable/,
         layerName: 'unreachable',
       },
-    ],
-  })]);
-
+    ] as PluginOptions['rules'],
+  },
+  {
+    name: 'Test map rules',
+    rules: [
+      {
+        map: (path: string) => {
+          if (path.startsWith('node_modules/test')) {
+            return 'modules.test';
+          }
+          if (path.startsWith('src/pages')) {
+            return 'my-pages';
+          }
+          if (path.startsWith('packages')) {
+            return 'my-packages';
+          }
+          if (path.startsWith('src')) {
+            return 'base';
+          }
+          return false;
+        },
+      },
+    ] as PluginOptions['rules'],
+  },
+])('$name', ({ rules }) => {
+  const processor = postcss([plugin({ rules })]);
   test.each([
     { from: resolve('node_modules/test/index.css'), input: 'a { width: 100%; }', output: '@layer modules.test { a { width: 100%; } }' },
     { from: resolve('src/pages/index.css'), input: 'a { width: 100%; }', output: '@layer my-pages { a { width: 100%; } }' },
@@ -131,29 +155,60 @@ describe('Test transform options', () => {
     a { width: 100%; }
   `;
 
-  test('Test transform without outsideAtRules import', async () => {
+  describe('Test transform without outsideAtRules import', async () => {
     const processor = postcss([plugin({
       rules: [
+        {
+          map: (path: string) => {
+            if (path.startsWith('src/views/') || path.startsWith('src\\view\\')) {
+              return 'my-views';
+            }
+            return false;
+          },
+        },
         {
           includes: /^src[\\/]pages/,
           layerName: 'my-pages',
         },
       ],
     })]);
-    (transform as Mock).mockClear();
-    const result = await processor.process(input, { from: resolve('src/pages/index.css') });
-    expect(await format(result.root.toString())).toBe(await format(`
-      @charset "UTF-8";
-      @namespace url("http://www.w3.org/1999/xhtml");
-      @import "test.css" layer(my-pages);
-      @layer my-pages { a { width: 100%; } }
-    `));
-    expect(transform).toHaveBeenCalledOnce();
-    expect(transform).toHaveBeenCalledWith(expect.any(Array), 'my-pages', expect.anything(), undefined);
+    test('Test filter rule', async () => {
+      (transform as Mock).mockClear();
+      const result = await processor.process(input, { from: resolve('src/pages/index.css') });
+      expect(await format(result.root.toString())).toBe(await format(`
+        @charset "UTF-8";
+        @namespace url("http://www.w3.org/1999/xhtml");
+        @import "test.css" layer(my-pages);
+        @layer my-pages { a { width: 100%; } }
+      `));
+      expect(transform).toHaveBeenCalledOnce();
+      expect(transform).toHaveBeenCalledWith(expect.anything(), 'my-pages', expect.anything(), {});
+    });
+    test('Test map rule', async () => {
+      (transform as Mock).mockClear();
+      const result = await processor.process(input, { from: resolve('src/views/index.css') });
+      expect(await format(result.root.toString())).toBe(await format(`
+        @charset "UTF-8";
+        @namespace url("http://www.w3.org/1999/xhtml");
+        @import "test.css" layer(my-views);
+        @layer my-views { a { width: 100%; } }
+      `));
+      expect(transform).toHaveBeenCalledOnce();
+      expect(transform).toHaveBeenCalledWith(expect.anything(), 'my-views', expect.anything(), {});
+    });
   });
-  test('Test transform with outsideAtRules import', async () => {
+
+  describe('Test transform with common option outsideAtRules import', async () => {
     const processor = postcss([plugin({
       rules: [
+        {
+          map: (path: string) => {
+            if (path.startsWith('src/views/') || path.startsWith('src\\view\\')) {
+              return 'my-views';
+            }
+            return false;
+          },
+        },
         {
           includes: /^src[\\/]pages/,
           layerName: 'my-pages',
@@ -163,15 +218,128 @@ describe('Test transform options', () => {
         outsideAtRules: ['import'],
       },
     })]);
-    (transform as Mock).mockClear();
-    const result = await processor.process(input, { from: resolve('src/pages/index.css') });
-    expect(await format(result.root.toString())).toBe(await format(`
-      @charset "UTF-8";
-      @namespace url("http://www.w3.org/1999/xhtml");
-      @import "test.css";
-      @layer my-pages { a { width: 100%; } }
-    `));
-    expect(transform).toHaveBeenCalledOnce();
-    expect(transform).toHaveBeenCalledWith(expect.any(Array), 'my-pages', expect.anything(), { outsideAtRules: ['import'] });
+    test('Test filter rule', async () => {
+      (transform as Mock).mockClear();
+      const result = await processor.process(input, { from: resolve('src/pages/index.css') });
+      expect(await format(result.root.toString())).toBe(await format(`
+        @charset "UTF-8";
+        @namespace url("http://www.w3.org/1999/xhtml");
+        @import "test.css";
+        @layer my-pages { a { width: 100%; } }
+      `));
+      expect(transform).toHaveBeenCalledOnce();
+      expect(transform).toHaveBeenCalledWith(expect.anything(), 'my-pages', expect.anything(), { outsideAtRules: ['import'] });
+    });
+    test('Test map rule', async () => {
+      (transform as Mock).mockClear();
+      const result = await processor.process(input, { from: resolve('src/views/index.css') });
+      expect(await format(result.root.toString())).toBe(await format(`
+        @charset "UTF-8";
+        @namespace url("http://www.w3.org/1999/xhtml");
+        @import "test.css";
+        @layer my-views { a { width: 100%; } }
+      `));
+      expect(transform).toHaveBeenCalledOnce();
+      expect(transform).toHaveBeenCalledWith(expect.anything(), 'my-views', expect.anything(), { outsideAtRules: ['import'] });
+    });
   });
+
+  describe('Test transform with rule option outsideAtRules import', async () => {
+    const processor = postcss([plugin({
+      rules: [
+        {
+          map: (path: string) => {
+            if (path.startsWith('src/views/') || path.startsWith('src\\view\\')) {
+              return { layerName: 'my-views', transformOptions: { outsideAtRules: ['import'] } };
+            }
+            return false;
+          },
+        },
+        {
+          includes: /^src[\\/]pages/,
+          layerName: 'my-pages',
+          transformOptions: {
+            outsideAtRules: ['import'],
+          },
+        },
+      ],
+    })]);
+    test('Test filter rule', async () => {
+      (transform as Mock).mockClear();
+      const result = await processor.process(input, { from: resolve('src/pages/index.css') });
+      expect(await format(result.root.toString())).toBe(await format(`
+        @charset "UTF-8";
+        @namespace url("http://www.w3.org/1999/xhtml");
+        @import "test.css";
+        @layer my-pages { a { width: 100%; } }
+      `));
+      expect(transform).toHaveBeenCalledOnce();
+      expect(transform).toHaveBeenCalledWith(expect.anything(), 'my-pages', expect.anything(), { outsideAtRules: ['import'] });
+    });
+    test('Test map rule', async () => {
+      (transform as Mock).mockClear();
+      const result = await processor.process(input, { from: resolve('src/views/index.css') });
+      expect(await format(result.root.toString())).toBe(await format(`
+        @charset "UTF-8";
+        @namespace url("http://www.w3.org/1999/xhtml");
+        @import "test.css";
+        @layer my-views { a { width: 100%; } }
+      `));
+      expect(transform).toHaveBeenCalledOnce();
+      expect(transform).toHaveBeenCalledWith(expect.anything(), 'my-views', expect.anything(), { outsideAtRules: ['import'] });
+    });
+  });
+});
+
+test('Test unknown rule type', async () => {
+  const processor = postcss([plugin({
+    rules: [
+      {
+        includes: /^src[\\/]pages/,
+        layerName: 'my-pages',
+      },
+      {
+        map: (path: string) => path.startsWith('src/views/') ? 'my-views' : false,
+      },
+      {
+        // @ts-expect-error - unknown rule type
+        unknown: true,
+      },
+    ],
+  })]);
+  const result = await processor.process('a { width: 100%; }', { from: resolve('src/pages/index.css') });
+  expect(await format(result.root.toString())).toBe(await format('@layer my-pages { a { width: 100%; } }'));
+});
+
+test('Test multiple installations of plugins', async () => {
+  const processor = postcss([
+    plugin({ rules: [
+      {
+        map: (path: string) => {
+          const g = /^src[\\/](\w+)[\\/]/.exec(path);
+          return g ? `my-${g[1]}` : false;
+        },
+      },
+    ] }),
+    plugin({ rules: [
+      {
+        includes: /^src[\\/]/,
+        layerName: 'code',
+      },
+    ] }),
+  ]);
+  const input = `
+    @import 'common.css';
+    a { width: 100%; }
+  `;
+  const inViewStyle = await processor.process(input, { from: resolve('src/views/index.css') });
+  expect(await format(inViewStyle.root.toString())).toBe(await format(`
+    @import 'common.css' layer(code.my-views);
+    @layer code { @layer my-views { a { width: 100%; } } }
+  `));
+  const outViewStyle = await processor.process(input, { from: resolve('src/index.css') });
+  expect(await format(outViewStyle.root.toString())).toBe(await format(`
+    @import 'common.css' layer(code);
+    @layer code { a { width: 100%; } }
+  `));
 });
