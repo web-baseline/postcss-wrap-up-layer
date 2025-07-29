@@ -40,7 +40,7 @@
   "author": "TM-SunnyDay <sunnyday@chongying.studio> (https://github.com/TM-SunnyDay/)",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/web-baseline/postcss-wrap-up-layer"
+    "url": "git+https://github.com/web-baseline/postcss-wrap-up-layer.git"
   },
   "engines": {
     "node": ">=18.0.0"
