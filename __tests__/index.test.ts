@@ -316,15 +316,15 @@ test('Test multiple installations of plugins', async () => {
     plugin({ rules: [
       {
         map: (path: string) => {
-          const g = /^src[\\/](\w+)[\\/]/.exec(path);
-          return g ? `my-${g[1]}` : false;
+          const g = /^node_modules[\\/](?:@([^\\/]+)[\\/])?([^\\/]+)[\\/]/.exec(path);
+          return g ? (g[1] ? g[1] : g[2]) : false;
         },
       },
     ] }),
     plugin({ rules: [
       {
-        includes: /^src[\\/]/,
-        layerName: 'code',
+        includes: /^node_modules[\\/]/,
+        layerName: 'lib',
       },
     ] }),
   ]);
@@ -332,14 +332,19 @@ test('Test multiple installations of plugins', async () => {
     @import 'common.css';
     a { width: 100%; }
   `;
-  const inViewStyle = await processor.process(input, { from: resolve('src/views/index.css') });
-  expect(await format(inViewStyle.root.toString())).toBe(await format(`
-    @import 'common.css' layer(code.my-views);
-    @layer code { @layer my-views { a { width: 100%; } } }
+  const inLibStyle = await processor.process(input, { from: resolve('node_modules/test-lib/index.css') });
+  expect(await format(inLibStyle.root.toString())).toBe(await format(`
+    @import 'common.css' layer(lib.test-lib);
+    @layer lib { @layer test-lib { a { width: 100%; } } }
   `));
-  const outViewStyle = await processor.process(input, { from: resolve('src/index.css') });
-  expect(await format(outViewStyle.root.toString())).toBe(await format(`
-    @import 'common.css' layer(code);
-    @layer code { a { width: 100%; } }
+  const inScopedStyle = await processor.process(input, { from: resolve('node_modules/@scoped/test-lib/index.css') });
+  expect(await format(inScopedStyle.root.toString())).toBe(await format(`
+    @import 'common.css' layer(lib.scoped);
+    @layer lib { @layer scoped { a { width: 100%; } } }
+  `));
+  const outLibStyle = await processor.process(input, { from: resolve('node_modules/index.css') });
+  expect(await format(outLibStyle.root.toString())).toBe(await format(`
+    @import 'common.css' layer(lib);
+    @layer lib { a { width: 100%; } }
   `));
 });

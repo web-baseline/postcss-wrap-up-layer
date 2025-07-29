@@ -28,6 +28,8 @@ Each file will only be processed according to **the first matching rule**. When 
 
 ### Example
 
+#### Using Filter Rules
+
 ```ts
 import WrapUpLayer from '@web-baseline/postcss-wrap-up-layer';
 
@@ -50,6 +52,81 @@ WrapUpLayer({
     {
       includes: (file) => file.startsWith('src/assets/base'),
       layerName: 'base',
+    },
+  ],
+});
+```
+
+#### Using Map Rules
+
+```ts
+import WrapUpLayer from '@web-baseline/postcss-wrap-up-layer';
+
+WrapUpLayer({
+  rules: [
+    {
+      map: (path, input) => {
+        // Dynamically determine layer name
+        if (path.startsWith('node_modules/')) {
+          const match = path.match(/node_modules\/([^\/]+)/);
+          return match ? `lib.${match[1]}` : 'lib';
+        }
+        if (path.startsWith('src/components/')) {
+          return 'components';
+        }
+        if (path.startsWith('src/')) {
+          return 'app';
+        }
+        // Return false to skip processing this file
+        return false;
+      },
+    },
+  ],
+});
+```
+
+#### Using Transform Options
+
+```ts
+import WrapUpLayer from '@web-baseline/postcss-wrap-up-layer';
+
+WrapUpLayer({
+  rules: [
+    {
+      includes: /^node_modules\//,
+      layerName: 'lib',
+      // Rule-level transform options
+      transformOptions: {
+        outsideAtRules: ['import'], // @import rules will stay outside @layer
+      },
+    },
+  ],
+  // Global transform options
+  transformOptions: {
+    outsideAtRules: ['charset', 'namespace'], // These are included by default
+  },
+});
+```
+
+#### Map Rules Returning Objects
+
+```ts
+import WrapUpLayer from '@web-baseline/postcss-wrap-up-layer';
+
+WrapUpLayer({
+  rules: [
+    {
+      map: (path, input) => {
+        if (path.startsWith('src/pages/')) {
+          return {
+            layerName: 'pages',
+            transformOptions: {
+              outsideAtRules: ['import'], // Configure transform options for specific files
+            },
+          };
+        }
+        return false;
+      },
     },
   ],
 });
@@ -107,17 +184,177 @@ p {
 }
 ```
 
+#### Transform Options Examples
+
+The plugin has special handling logic for `@import` rules:
+
+1. **When `@import` is in `outsideAtRules`**: `@import` rules stay outside `@layer` without any modification
+2. **When `@import` is not in `outsideAtRules`**: The plugin will attempt to add `layer()` function to `@import` rules
+3. **When `@import` already has `layer()` function**: The plugin will wrap the existing layer name as a sub-layer under the current rule's layer name (e.g., `layer(base)` becomes `layer(pages.base)`)
+
+```css
+/** Input file: `src/pages/index.css` (configured with outsideAtRules: ['import']) */
+@import "common.css";
+.page {
+  padding: 1rem;
+}
+
+/** Output: */
+@import "common.css";
+@layer pages {
+  .page {
+    padding: 1rem;
+  }
+}
+```
+
+```css
+/** Input file: `src/pages/about.css` (default @import handling) */
+@import "reset.css";
+.about {
+  margin: 0;
+}
+
+/** Output: */
+@import "reset.css" layer(pages);
+@layer pages {
+  .about {
+    margin: 0;
+  }
+}
+```
+
+```css
+/** Input file: `src/pages/contact.css` (existing layer function) */
+@import "base.css" layer(base);
+.contact {
+  background: white;
+}
+
+/** Output: */
+@import "base.css" layer(pages.base);
+@layer pages {
+  .contact {
+    background: white;
+  }
+}
+```
+
 ## Options Type
 
 ```ts
-export type RuleItem = {
+// Filter rule: Match files based on path
+export interface FilterRuleItem {
   includes: RegExp | ((path: string, input: import('postcss').Input) => boolean);
   layerName: string;
-};
+  transformOptions?: TransformOptions;
+}
+
+// Map rule: Dynamically generate layer names
+export interface MapRuleItem {
+  map: (path: string, input: import('postcss').Input) =>
+    string | boolean | { layerName: string; transformOptions?: TransformOptions };
+}
+
+export type RuleItem = FilterRuleItem | MapRuleItem;
+
+export interface TransformOptions {
+  /** Specify which @rules should stay outside @layer */
+  outsideAtRules?: string[];
+}
 
 export type PluginOptions = {
   rules: RuleItem[];
   /** If set to true, files containing only comments will be ignored */
   ignoreOnlyComments?: boolean;
+  /** Global transform options */
+  transformOptions?: TransformOptions;
 };
 ```
+
+### Rule Types Explanation
+
+- **Filter Rule (FilterRuleItem)**: Uses the `includes` property to match file paths, applying the specified `layerName` when matched
+- **Map Rule (MapRuleItem)**: Uses the `map` function to dynamically determine layer names, can return:
+  - `string`: Layer name
+  - `boolean`: `false` means skip processing this file
+  - `object`: Contains `layerName` and optional `transformOptions`
+
+### Transform Options Explanation
+
+`transformOptions` can be configured at:
+1. **Global level**: In `PluginOptions.transformOptions`
+2. **Rule level**: In `FilterRuleItem.transformOptions`
+3. **Map return**: In the object returned by `MapRuleItem.map`
+
+**Option Priority and Merging Rules:**
+- Rule-level options have higher priority than global options
+- Only first-level option objects are automatically merged, nested arrays or objects will not be automatically merged
+  - `outsideAtRules` arrays will not be merged, rule-level configuration will completely replace global configuration
+- If nested processing is needed (such as merging arrays), it can be achieved by creating the plugin multiple times
+
+#### Nested Processing Example
+
+```ts
+import WrapUpLayer from '@web-baseline/postcss-wrap-up-layer';
+
+// First plugin instance
+const specificPlugin = WrapUpLayer({
+  rules: [
+    {
+      map: (path: string) => {
+        const g = /^node_modules[\\/](?:@([^\\/]+)[\\/])?([^\\/]+)[\\/]/.exec(path);
+        return g ? (g[1] ? g[1] : g[2]) : false;
+      },
+    },
+  ],
+});
+
+// Second plugin instance: Add lib layer for entire node_modules
+const globalPlugin = WrapUpLayer({
+  rules: [
+    {
+      includes: /^node_modules\//,
+      layerName: 'lib',
+    },
+  ],
+});
+
+// Use multiple plugin instances in PostCSS configuration
+export default {
+  plugins: [
+    specificPlugin,
+    globalPlugin,
+  ],
+};
+```
+
+
+```css
+/** Input file content */
+@import 'common.css';
+a { width: 100%; }
+
+/** When file is `node_modules/test-lib/index.css`, output: */
+@import 'common.css' layer(lib.test-lib);
+@layer lib { @layer test-lib { a { width: 100%; } } }
+
+/** When file is `node_modules/@scoped/test-lib/index.css`, output: */
+@import 'common.css' layer(lib.scoped);
+@layer lib { @layer scoped { a { width: 100%; } } }
+
+/** When file is `node_modules/index.css`, output: */
+@import 'common.css' layer(lib);
+@layer lib { a { width: 100%; } }
+```
+
+#### Default outsideAtRules
+
+By default, the following @rules will stay outside @layer:
+- `charset`
+- `namespace`
+- `property`
+- `font-face`
+- `keyframes`
+
+You can add more rules (like `import`) through `transformOptions.outsideAtRules`.
