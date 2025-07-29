@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import postcss from 'postcss';
 import prettier from 'prettier';
 
-import { transform, TransformOptions } from '~/transform';
+import { transform, type TransformOptions } from '~/transform.js';
 
 async function format (cssString: string) {
   return prettier.format(cssString, { parser: 'css' });

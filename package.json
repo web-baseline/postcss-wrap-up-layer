@@ -32,8 +32,9 @@
     "postcss-plugin"
   ],
   "scripts": {
-    "build": "unbuild",
-    "test": "vitest"
+    "type-check": "tsc --noEmit --project tsconfig.vitest.json",
+    "build": "npm run type-check && unbuild",
+    "test": "npm run type-check && vitest"
   },
   "license": "MIT",
   "author": "TM-SunnyDay <sunnyday@chongying.studio> (https://github.com/TM-SunnyDay/)",
@@ -53,6 +54,7 @@
     "@eslint/js": "^9.31.0",
     "@eslint/markdown": "^7.0.0",
     "@stylistic/eslint-plugin": "^5.2.0",
+    "@tsconfig/node22": "^22.0.2",
     "@types/node": "^24.0.14",
     "@vitest/coverage-v8": "^3.2.4",
     "@vitest/ui": "^3.2.4",
