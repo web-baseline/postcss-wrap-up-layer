@@ -1,6 +1,6 @@
 {
   "name": "@web-baseline/postcss-wrap-up-layer",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "PostCSS plugin to add cascade layers to CSS",
   "type": "module",
   "main": "./dist/index.cjs",
