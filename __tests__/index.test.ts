@@ -1,9 +1,9 @@
-import { expect, test, describe, vi, Mock } from 'vitest';
+import { expect, test, describe, vi, type Mock } from 'vitest';
 import postcss, { type Input } from 'postcss';
 import { resolve } from 'node:path';
 
-import plugin, { type PluginOptions } from '~/index';
-import { transform } from '~/transform';
+import plugin, { type PluginOptions } from '~/index.js';
+import { transform } from '~/transform.js';
 import { beforeEach } from 'node:test';
 import prettier from 'prettier';
 

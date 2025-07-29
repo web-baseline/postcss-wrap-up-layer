@@ -1,9 +1,9 @@
 import type { PluginCreator } from 'postcss';
 import { relative } from 'node:path';
 import { cwd } from 'node:process';
-import { transform, TransformOptions } from './transform';
-import { isFilterRule, isMapRule, RuleItem } from './utils';
-export { RuleItem, FilterRuleItem, MapRuleItem } from './utils';
+import { transform, type TransformOptions } from './transform.js';
+import { isFilterRule, isMapRule, type RuleItem } from './utils.js';
+export type { RuleItem, FilterRuleItem, MapRuleItem } from './utils.js';
 
 export type PluginOptions = {
   rules: RuleItem[];

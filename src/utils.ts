@@ -1,5 +1,5 @@
 import { Input } from 'postcss';
-import { TransformOptions } from './transform';
+import type { TransformOptions } from './transform.js';
 
 export interface FilterRuleItem {
   includes: RegExp | ((path: string, input: Input) => boolean);

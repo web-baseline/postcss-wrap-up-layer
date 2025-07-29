@@ -1,4 +1,4 @@
-import { AtRule, atRule, ChildNode, Source } from 'postcss';
+import { AtRule, atRule, type ChildNode, type Source } from 'postcss';
 
 export interface TransformOptions {
   outsideAtRules?: string[];
